@@ -1,4 +1,4 @@
-// Họ và tên: Trần Tuấn Sơn
+// Họ và tên: Trần Tuấn Sơn (Sinh viên 2)
 // Mã sinh viên: 23203100043
 // Nội dung thực hiện: Quản lý bàn ăn + Tìm kiếm + Lọc + Sắp xếp + Phân trang
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +18,7 @@ namespace QuanLyNhaHang.Controllers
         public IActionResult Index(string? tuKhoa, int? maLoaiBan, int? soCho, TrangThaiBan? trangThai, string? sapXep, int trang = 1)
         {
             IQueryable<BanAn> query = _db.BanAns.Include(b => b.LoaiBan);
+            tuKhoa = tuKhoa?.Trim();
 
             // ----- Tìm kiếm (LINQ) theo Tên bàn hoặc Vị trí -----
             if (!string.IsNullOrWhiteSpace(tuKhoa))
@@ -30,7 +31,7 @@ namespace QuanLyNhaHang.Controllers
                 query = query.Where(b => b.MaLoaiBan == maLoaiBan.Value);
 
             if (soCho.HasValue)
-                query = query.Where(b => b.SoChoNgoi >= soCho.Value);
+                query = query.Where(b => b.SoChoNgoi == soCho.Value);
 
             if (trangThai.HasValue)
                 query = query.Where(b => b.TrangThai == trangThai.Value);
@@ -39,9 +40,9 @@ namespace QuanLyNhaHang.Controllers
             query = sapXep switch
             {
                 "ten_za" => query.OrderByDescending(b => b.TenBan).ThenBy(b => b.MaBan),
-                "choNgoi_tang" => query.OrderBy(b => b.SoChoNgoi).ThenBy(b => b.MaBan),
-                "choNgoi_giam" => query.OrderByDescending(b => b.SoChoNgoi).ThenBy(b => b.MaBan),
-                _ => query.OrderBy(b => b.TenBan).ThenBy(b => b.MaBan) // mặc định A -> Z
+                "choNgoi_tang" => query.OrderBy(b => b.SoChoNgoi).ThenBy(b => b.TenBan),
+                "choNgoi_giam" => query.OrderByDescending(b => b.SoChoNgoi).ThenBy(b => b.TenBan),
+                _ => query.OrderBy(b => b.TenBan) // mặc định A -> Z
             };
 
             var vm = new BanAnListVM
@@ -51,16 +52,12 @@ namespace QuanLyNhaHang.Controllers
                 SoChoNgoiLoc = soCho,
                 TrangThaiLoc = trangThai,
                 SapXep = sapXep,
-                DanhSachLoaiBan = _db.LoaiBans.OrderBy(l => l.TenLoaiBan).ToList()
+                DanhSachLoaiBan = _db.LoaiBans.Where(l => l.TrangThai).OrderBy(l => l.TenLoaiBan).ToList()
             };
 
             vm.TongSoBan = query.Count();
 
-            if (trang < 1) trang = 1;
-            if (vm.TongSoTrang == 0)
-                trang = 1;
-            else if (trang > vm.TongSoTrang)
-                trang = vm.TongSoTrang;
+            trang = Math.Clamp(trang, 1, Math.Max(vm.TongSoTrang, 1));
             vm.TrangHienTai = trang;
 
             // ----- Phân trang bằng Skip()/Take() trên truy vấn EF Core -----
@@ -72,19 +69,10 @@ namespace QuanLyNhaHang.Controllers
             return View(vm);
         }
 
-        public IActionResult Details(int id, string? tuKhoa, int? maLoaiBan, int? soCho,
-            TrangThaiBan? trangThai, string? sapXep, int trang = 1)
+        public IActionResult Details(int id)
         {
             var ban = _db.BanAns.Include(b => b.LoaiBan).FirstOrDefault(b => b.MaBan == id);
             if (ban == null) return NotFound();
-
-            ViewBag.TuKhoa = tuKhoa;
-            ViewBag.MaLoaiBan = maLoaiBan;
-            ViewBag.SoCho = soCho;
-            ViewBag.TrangThai = trangThai;
-            ViewBag.SapXep = sapXep;
-            ViewBag.Trang = trang;
-
             return View(ban);
         }
 
@@ -92,10 +80,7 @@ namespace QuanLyNhaHang.Controllers
         [RequireAdmin, HttpGet]
         public IActionResult Create()
         {
-            ViewBag.DanhSachLoaiBan = _db.LoaiBans
-                .Where(l => l.TrangThai)
-                .OrderBy(l => l.TenLoaiBan)
-                .ToList();
+            ViewBag.DanhSachLoaiBan = _db.LoaiBans.ToList();
             return View();
         }
 
@@ -104,21 +89,18 @@ namespace QuanLyNhaHang.Controllers
         public IActionResult Create(BanAn model)
         {
             model.TenBan = model.TenBan?.Trim() ?? string.Empty;
-            ModelState.Remove(nameof(model.TenBan));
-            TryValidateModel(model);
+            model.ViTri = model.ViTri?.Trim() ?? string.Empty;
 
             if (_db.BanAns.Any(b => b.TenBan == model.TenBan))
                 ModelState.AddModelError(nameof(model.TenBan), "Tên bàn đã tồn tại.");
-
-            if (!_db.LoaiBans.Any(l => l.MaLoaiBan == model.MaLoaiBan && l.TrangThai))
-                ModelState.AddModelError(nameof(model.MaLoaiBan), "Loại bàn không tồn tại hoặc đã ngừng sử dụng.");
+            if (!_db.LoaiBans.Any(l => l.MaLoaiBan == model.MaLoaiBan))
+                ModelState.AddModelError(nameof(model.MaLoaiBan), "Loại bàn không tồn tại.");
+            if (!Enum.IsDefined(typeof(TrangThaiBan), model.TrangThai))
+                ModelState.AddModelError(nameof(model.TrangThai), "Trạng thái bàn không hợp lệ.");
 
             if (!ModelState.IsValid)
             {
-                ViewBag.DanhSachLoaiBan = _db.LoaiBans
-                    .Where(l => l.TrangThai)
-                    .OrderBy(l => l.TenLoaiBan)
-                    .ToList();
+                ViewBag.DanhSachLoaiBan = _db.LoaiBans.ToList();
                 return View(model);
             }
 
@@ -133,10 +115,7 @@ namespace QuanLyNhaHang.Controllers
         {
             var ban = _db.BanAns.Find(id);
             if (ban == null) return NotFound();
-            ViewBag.DanhSachLoaiBan = _db.LoaiBans
-                .Where(l => l.TrangThai || l.MaLoaiBan == ban.MaLoaiBan)
-                .OrderBy(l => l.TenLoaiBan)
-                .ToList();
+            ViewBag.DanhSachLoaiBan = _db.LoaiBans.ToList();
             return View(ban);
         }
 
@@ -146,29 +125,30 @@ namespace QuanLyNhaHang.Controllers
         {
             if (id != model.MaBan) return NotFound();
 
-            var banHienTai = _db.BanAns.AsNoTracking().FirstOrDefault(b => b.MaBan == id);
-            if (banHienTai == null) return NotFound();
-
             model.TenBan = model.TenBan?.Trim() ?? string.Empty;
-            ModelState.Remove(nameof(model.TenBan));
-            TryValidateModel(model);
+            model.ViTri = model.ViTri?.Trim() ?? string.Empty;
 
             if (_db.BanAns.Any(b => b.TenBan == model.TenBan && b.MaBan != id))
                 ModelState.AddModelError(nameof(model.TenBan), "Tên bàn đã tồn tại.");
-
-            if (!_db.LoaiBans.Any(l => l.MaLoaiBan == model.MaLoaiBan && (l.TrangThai || l.MaLoaiBan == banHienTai.MaLoaiBan)))
-                ModelState.AddModelError(nameof(model.MaLoaiBan), "Loại bàn không tồn tại hoặc đã ngừng sử dụng.");
+            if (!_db.LoaiBans.Any(l => l.MaLoaiBan == model.MaLoaiBan))
+                ModelState.AddModelError(nameof(model.MaLoaiBan), "Loại bàn không tồn tại.");
+            if (!Enum.IsDefined(typeof(TrangThaiBan), model.TrangThai))
+                ModelState.AddModelError(nameof(model.TrangThai), "Trạng thái bàn không hợp lệ.");
 
             if (!ModelState.IsValid)
             {
-                ViewBag.DanhSachLoaiBan = _db.LoaiBans
-                    .Where(l => l.TrangThai || l.MaLoaiBan == model.MaLoaiBan)
-                    .OrderBy(l => l.TenLoaiBan)
-                    .ToList();
+                ViewBag.DanhSachLoaiBan = _db.LoaiBans.ToList();
                 return View(model);
             }
 
-            _db.BanAns.Update(model);
+            var ban = _db.BanAns.Find(id);
+            if (ban == null) return NotFound();
+            ban.TenBan = model.TenBan;
+            ban.MaLoaiBan = model.MaLoaiBan;
+            ban.SoChoNgoi = model.SoChoNgoi;
+            ban.ViTri = model.ViTri;
+            ban.MoTa = model.MoTa;
+            ban.TrangThai = model.TrangThai;
             _db.SaveChanges();
             TempData["ThongBao"] = "Cập nhật bàn ăn thành công.";
             return RedirectToAction(nameof(Index));
@@ -206,15 +186,11 @@ namespace QuanLyNhaHang.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult CapNhatTrangThai(int id, TrangThaiBan trangThai)
         {
+            if (!Enum.IsDefined(typeof(TrangThaiBan), trangThai))
+                return BadRequest();
+
             var ban = _db.BanAns.Find(id);
             if (ban == null) return NotFound();
-
-            if (!ModelState.IsValid || !Enum.IsDefined(typeof(TrangThaiBan), trangThai))
-            {
-                TempData["Loi"] = "Trạng thái bàn không hợp lệ.";
-                return RedirectToAction(nameof(Details), new { id });
-            }
-
             ban.TrangThai = trangThai;
             _db.SaveChanges();
             TempData["ThongBao"] = "Cập nhật trạng thái bàn thành công.";

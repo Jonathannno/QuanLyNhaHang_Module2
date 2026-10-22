@@ -1,4 +1,4 @@
-// Họ và tên: Trần Tuấn Sơn
+// Họ và tên: Trần Tuấn Sơn (Sinh viên 2)
 // Mã sinh viên: 23203100043
 // Nội dung thực hiện: Entity Bàn ăn
 using System.ComponentModel.DataAnnotations;

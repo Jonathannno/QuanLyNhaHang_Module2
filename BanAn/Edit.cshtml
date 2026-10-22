@@ -1,0 +1,42 @@
+@model BanAn
+@{ ViewData["Title"] = "Sửa bàn ăn"; }
+<h3 class="section-title">Sửa bàn ăn</h3>
+<div class="card p-4 col-lg-7">
+    <form asp-action="Edit" asp-route-id="@Model.MaBan" method="post">
+        <input type="hidden" asp-for="MaBan" />
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="mb-3">
+            <label asp-for="TenBan" class="form-label"></label>
+            <input asp-for="TenBan" class="form-control" />
+            <span asp-validation-for="TenBan" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="MaLoaiBan" class="form-label"></label>
+            <select asp-for="MaLoaiBan" class="form-select"
+                    asp-items="@(new SelectList(ViewBag.DanhSachLoaiBan, "MaLoaiBan", "TenLoaiBan"))"></select>
+            <span asp-validation-for="MaLoaiBan" class="text-danger"></span>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label asp-for="SoChoNgoi" class="form-label"></label>
+                <input asp-for="SoChoNgoi" type="number" class="form-control" />
+                <span asp-validation-for="SoChoNgoi" class="text-danger"></span>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label asp-for="ViTri" class="form-label"></label>
+                <input asp-for="ViTri" class="form-control" />
+                <span asp-validation-for="ViTri" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label asp-for="MoTa" class="form-label"></label>
+            <textarea asp-for="MoTa" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="mb-4">
+            <label asp-for="TrangThai" class="form-label"></label>
+            <select asp-for="TrangThai" asp-items="Html.GetEnumSelectList<TrangThaiBan>()" class="form-select"></select>
+        </div>
+        <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg me-1"></i>Cập nhật</button>
+        <a asp-action="Index" class="btn btn-outline-dark">Hủy</a>
+    </form>
+</div>

@@ -1,0 +1,158 @@
+@model BanAnListVM
+@{
+    ViewData["Title"] = "Danh sách bàn ăn";
+    var maTaiKhoan = Context.Session.GetInt32(SessionKeys.MaTaiKhoan);
+    var vaiTro = Context.Session.GetString(SessionKeys.VaiTro);
+    var laAdmin = vaiTro == VaiTro.Admin.ToString();
+
+    string IconLoai(string? ten) => ten switch
+    {
+        var t when t != null && t.Contains("VIP") => "bi-gem",
+        var t when t != null && t.Contains("ngoài trời") => "bi-tree",
+        var t when t != null && t.Contains("tiệc") => "bi-people-fill",
+        _ => "bi-table"
+    };
+    string BadgeTrangThai(TrangThaiBan tt) => tt switch
+    {
+        TrangThaiBan.SanSang => "badge-soft-success",
+        TrangThaiBan.DangSuDung => "badge-soft-warning",
+        _ => "badge-soft-danger"
+    };
+    string IconTrangThai(TrangThaiBan tt) => tt switch
+    {
+        TrangThaiBan.SanSang => "bi-check-circle-fill",
+        TrangThaiBan.DangSuDung => "bi-hourglass-split",
+        _ => "bi-slash-circle-fill"
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h3 class="section-title mb-0">Danh sách bàn ăn</h3>
+        <p class="text-muted mb-0">Tìm bàn phù hợp và đặt chỗ chỉ trong vài giây</p>
+    </div>
+    @if (laAdmin)
+    {
+        <a class="btn btn-gold" asp-action="Create"><i class="bi bi-plus-circle me-1"></i> Thêm bàn ăn</a>
+    }
+</div>
+
+<form method="get" asp-action="Index" class="filter-panel row g-3 mb-4 align-items-end">
+    <div class="col-md-3">
+        <label class="form-label"><i class="bi bi-search me-1"></i>Tìm kiếm</label>
+        <input type="text" name="tuKhoa" value="@Model.TuKhoa" class="form-control" placeholder="Tên bàn / vị trí..." />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Loại bàn</label>
+        <select name="maLoaiBan" class="form-select">
+            <option value="">Tất cả</option>
+            @foreach (var lb in Model.DanhSachLoaiBan)
+            {
+                <option value="@lb.MaLoaiBan" selected="@(Model.MaLoaiBanLoc == lb.MaLoaiBan)">@lb.TenLoaiBan</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Số chỗ ngồi</label>
+        <input type="number" name="soCho" value="@Model.SoChoNgoiLoc" class="form-control" placeholder="VD: 4" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Trạng thái</label>
+        <select name="trangThai" class="form-select">
+            <option value="">Tất cả</option>
+            @foreach (var tt in Enum.GetValues<TrangThaiBan>())
+            {
+                <option value="@((int)tt)" selected="@(Model.TrangThaiLoc == tt)">@tt</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Sắp xếp</label>
+        <select name="sapXep" class="form-select">
+            <option value="ten_az" selected="@(Model.SapXep == "ten_az" || string.IsNullOrEmpty(Model.SapXep))">Tên A → Z</option>
+            <option value="ten_za" selected="@(Model.SapXep == "ten_za")">Tên Z → A</option>
+            <option value="choNgoi_tang" selected="@(Model.SapXep == "choNgoi_tang")">Số chỗ tăng dần</option>
+            <option value="choNgoi_giam" selected="@(Model.SapXep == "choNgoi_giam")">Số chỗ giảm dần</option>
+        </select>
+    </div>
+    <div class="col-md-1">
+        <button type="submit" class="btn btn-dark w-100"><i class="bi bi-filter"></i></button>
+    </div>
+</form>
+
+<p class="text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Tìm thấy <b>@Model.TongSoBan</b> bàn phù hợp</p>
+
+@if (!Model.DanhSachBan.Any())
+{
+    <div class="empty-state">
+        <i class="bi bi-emoji-frown"></i>
+        <h5>Không tìm thấy bàn nào phù hợp</h5>
+        <p class="text-muted">Hãy thử thay đổi bộ lọc tìm kiếm</p>
+    </div>
+}
+
+<div class="row g-4">
+@foreach (var ban in Model.DanhSachBan)
+{
+    <div class="col-md-4">
+        <div class="table-card">
+            <div class="table-card-head">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="table-icon"><i class="bi @IconLoai(ban.LoaiBan?.TenLoaiBan)"></i></div>
+                    <div>
+                        <div class="fw-bold">@ban.TenBan</div>
+                        <div class="small" style="opacity:0.85">@ban.LoaiBan?.TenLoaiBan</div>
+                    </div>
+                </div>
+                <span class="badge @BadgeTrangThai(ban.TrangThai)"><i class="bi @IconTrangThai(ban.TrangThai) me-1"></i>@ban.TrangThai</span>
+            </div>
+            <div class="table-card-body">
+                <div class="info-row"><i class="bi bi-people"></i> Sức chứa: <b>@ban.SoChoNgoi người</b></div>
+                <div class="info-row"><i class="bi bi-geo-alt"></i> Vị trí: @ban.ViTri</div>
+                @if (!string.IsNullOrWhiteSpace(ban.MoTa))
+                {
+                    <div class="info-row"><i class="bi bi-chat-left-text"></i> <span class="text-truncate">@ban.MoTa</span></div>
+                }
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                    <a class="btn btn-sm btn-outline-dark" asp-action="Details" asp-route-id="@ban.MaBan"><i class="bi bi-eye me-1"></i>Chi tiết</a>
+                    @if (!laAdmin && maTaiKhoan != null && ban.TrangThai == TrangThaiBan.SanSang)
+                    {
+                        <a class="btn btn-sm btn-gold" asp-controller="PhieuDatBan" asp-action="Create" asp-route-maBan="@ban.MaBan"><i class="bi bi-calendar-plus me-1"></i>Đặt bàn</a>
+                    }
+                    @if (laAdmin)
+                    {
+                        <a class="btn btn-sm btn-outline-dark" asp-action="Edit" asp-route-id="@ban.MaBan"><i class="bi bi-pencil"></i></a>
+                        <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@ban.MaBan"><i class="bi bi-trash"></i></a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+</div>
+
+@{
+    string UrlTrang(int trang) => Url.Action("Index", new {
+        tuKhoa = Model.TuKhoa, maLoaiBan = Model.MaLoaiBanLoc, soCho = Model.SoChoNgoiLoc,
+        trangThai = Model.TrangThaiLoc, sapXep = Model.SapXep, trang
+    })!;
+}
+@if (Model.TongSoTrang > 1)
+{
+    <nav class="mt-5">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.TrangHienTai <= 1 ? "disabled" : "")">
+                <a class="page-link" href="@UrlTrang(Model.TrangHienTai - 1)"><i class="bi bi-chevron-left"></i></a>
+            </li>
+            @for (int i = 1; i <= Model.TongSoTrang; i++)
+            {
+                <li class="page-item @(i == Model.TrangHienTai ? "active" : "")">
+                    <a class="page-link" href="@UrlTrang(i)">@i</a>
+                </li>
+            }
+            <li class="page-item @(Model.TrangHienTai >= Model.TongSoTrang ? "disabled" : "")">
+                <a class="page-link" href="@UrlTrang(Model.TrangHienTai + 1)"><i class="bi bi-chevron-right"></i></a>
+            </li>
+        </ul>
+    </nav>
+}
